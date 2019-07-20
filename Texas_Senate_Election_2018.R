@@ -1,15 +1,16 @@
 #libraries
 library(janitor)
 library(dplyr)
-
+library(cartogram) 
+library(mapproj)
 
 #so numbers do not show as scientific notation 
 options(scipen = 999)
 
 
 #map file 
-mymap <- st_read("Texas_County_Boundaries_Detailed.shp", stringsAsFactors = FALSE)
-mymap <- clean_names(mymap)
+mymap <- readOGR("Texas_County_Boundaries_Detailed.shp")
+mymap@data <- clean_names(mymap@data)
 
 
 #voting results 
@@ -19,8 +20,8 @@ voting_results$i_county <- as.character(voting_results$i_county)
 voting_results$voted_for <- as.character(voting_results$voted_for)
 
 #joining map and voting results 
-mymap_voting <- left_join(mymap, voting_results, by = c("cnty_nm" = "i_county"))
-mymap_voting <- arrange(mymap_voting, cnty_nm)
+mymap@data <- left_join(mymap@data, voting_results, by = c("cnty_nm" = "i_county"))
+mymap@data <- arrange(mymap@data, cnty_nm)
 
 
 #population per county **the csv was changed to eliminate "County, Texas" from the values of every county name 
@@ -34,9 +35,49 @@ pop$county <- as.character(pop$county)
 pop$population <- as.numeric(as.character(pop$population))
 
 #big join
-mymap_voted_pop <- bind_cols(mymap_voting, pop)
-mymap_voted_pop <- select(mymap_voted_pop, county, gid, voted_for, population, geometry)
-mymap_voted_pop$voted_for[is.na(mymap_voted_pop$voted_for)] <- "Cruz"
+mymap@data <- bind_cols(mymap@data, pop)
+mymap@data <- select(mymap@data, county, gid, voted_for, population)
+mymap@data$voted_for[is.na(mymap@data$voted_for)] <- "Cruz"
 
 #mapping
-ggplot(mymap_voted_pop) + geom_sf(aes(fill= voted_for, geometry = geometry)) 
+texas_cartogram <- cartogram(mymap, "population", itermax=7)
+
+
+texas_cartogram_df <- tidy(texas_cartogram) %>% left_join(. , texas_cartogram@data, by=c("id"="gid")) 
+texas_df <- tidy(mymap) %>% left_join(. , mymap@data, by=c("id"="gid")) 
+
+# And using the advices of chart #331 we can custom it to get a better result:
+ggplot() +
+  geom_polygon(data = texas_df, aes(fill = voted_for, x = long, y = lat, group = group) , size=0, alpha=0.9) +
+  theme_void() +
+  labs( title = "2018 Texas Senate Election", subtitle="by county" ) +
+  ylim(-35,35) +
+  theme(
+    text = element_text(color = "#22211d"), 
+    plot.background = element_rect(fill = "#f5f5f4", color = NA), 
+    panel.background = element_rect(fill = "#f5f5f4", color = NA), 
+    legend.background = element_rect(fill = "#f5f5f4", color = NA),
+    plot.title = element_text(size= 22, hjust=0.5, color = "#4e4d47", margin = margin(b = -0.1, t = 0.4, l = 2, unit = "cm")),
+    plot.subtitle = element_text(size= 13, hjust=0.5, color = "#4e4d47", margin = margin(b = -0.1, t = 0.4, l = 2, unit = "cm")),
+    legend.position = c(0.2, 0.26)
+  ) +
+  coord_map()
+
+# You can do the same for afr_cartogram_df
+
+ggplot() +
+  geom_polygon(data = texas_cartogram_df, aes(fill = voted_for, x = long, y = lat, group = group) , size=0, alpha=0.9) +
+  theme_void() +
+  labs( title = "2018 Texas Senate Election", subtitle="by county" ) +
+  ylim(-35,35) +
+  theme(
+    text = element_text(color = "#22211d"), 
+    plot.background = element_rect(fill = "#f5f5f4", color = NA), 
+    panel.background = element_rect(fill = "#f5f5f4", color = NA), 
+    legend.background = element_rect(fill = "#f5f5f4", color = NA),
+    plot.title = element_text(size= 22, hjust=0.5, color = "#4e4d47", margin = margin(b = -0.1, t = 0.4, l = 2, unit = "cm")),
+    plot.subtitle = element_text(size= 13, hjust=0.5, color = "#4e4d47", margin = margin(b = -0.1, t = 0.4, l = 2, unit = "cm")),
+    legend.position = c(0.2, 0.26)
+  ) +
+  coord_map()
+
