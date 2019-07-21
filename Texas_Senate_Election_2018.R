@@ -3,6 +3,7 @@ library(janitor)
 library(dplyr)
 library(cartogram) 
 library(mapproj)
+library(maptools)
 
 #so numbers do not show as scientific notation 
 options(scipen = 999)

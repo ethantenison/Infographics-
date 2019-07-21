@@ -1,0 +1,61 @@
+---
+title: "World Military Expenditures"
+author: "Ethan Tenison"
+date: "7/21/2019"
+output: html_document
+---
+
+```{r libraries}
+library(dplyr)
+library(cartogram) 
+library(mapproj)
+library(maptools)
+library(tidyverse)
+library(broom)
+library(viridis)
+
+```
+
+The data I used is from the SIPRI Military Expenditure Database. 
+```{r adding military expenditure data}
+
+military_expenditure <- read.csv("Military_expenditure_iso2.csv")
+
+military_expenditure <- rename(military_expenditure, ISO2 = ï..ISO2,expenditure_2018 = X2018)
+
+```
+
+
+Wrld_simpl is a "Large SpatialPolygonDataFrame". In the Africa example, when afr is created the data frame is converted to a "Formal Class SpatialPolygonDataFrame", but that is not the case here where I have selected Asia. The dataframe remains the same class. 
+```{r joining the two together}
+data(wrld_simpl)
+
+asia=wrld_simpl[wrld_simpl$REGION==142,]
+
+asia@data <- left_join(asia@data, military_expenditure, by = "ISO2")
+
+asia@data$expenditure_2018 <- as.double(asia@data$expenditure_2018)
+
+asia@data$expenditure_2018[is.na(asia@data$expenditure_2018)] <- 1
+```
+
+
+```{r cartogram, cache= TRUE}
+asia_cartogram <- cartogram_cont(asia, "expenditure_2018", itermax=30)
+```
+
+
+When the data is transformed using tidy(), the ISO3 informatino disappers. This does not happen in the Africa example. 
+```{r ggplÓt}
+spdf_fortified <- tidy(asia_cartogram)
+spdf_fortified = spdf_fortified %>% left_join(. , asia_cartogram@data, by=c("id"="ISO3")) 
+
+```
+
+
+``` {r plÓt}
+ggplot() +
+  geom_polygon(data = spdf_fortified, aes(fill = expenditure_2018, x = long, y = lat, group = group) , size=0, alpha=0.9) +
+  coord_map() +
+  theme_void()
+```
